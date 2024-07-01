@@ -15,3 +15,84 @@
 ```
 $ vagrant up
 ```
+2. Устанавливаем Borg Backup на сервер и клиент:
+```
+# apt update
+# apt install borgbackup
+```
+3. На сервере backup создаем пользователя и каталог /var/backup. Особенностью Borg Backup является то, что он создает репозитории для хранения резервных копий в собственной домашней директории.
+```
+root@backupServer:~# mkdir /var/backup
+root@backupServer:~# useradd -m -d /var/backup borg
+chown borg:borg /var/backup/
+```
+4. Подготовим и примонтируем дополнительный диск для хранения бэкапов:
+```
+root@backupServer:~# lsblk
+NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
+loop0    7:0    0   87M  1 loop /snap/lxd/28373
+loop1    7:1    0 38.8M  1 loop /snap/snapd/21759
+loop2    7:2    0 63.9M  1 loop /snap/core20/2318
+sda      8:0    0   40G  0 disk 
+└─sda1   8:1    0   40G  0 part /
+sdb      8:16   0   10M  0 disk 
+sdc      8:32   0    2G  0 disk 
+
+```
+```
+root@backupServer:~# mkfs.ext4 /dev/sdc
+root@backupServer:~# echo "`blkid | grep sdc | awk '{print $2}'` /var/backup ext4 defaults 0 0" >> /etc/fstab
+root@backupServer:~# mount -a
+```
+```
+root@backupServer:~# df -h
+Filesystem      Size  Used Avail Use% Mounted on
+tmpfs           144M  988K  143M   1% /run
+/dev/sda1        39G  1.7G   38G   5% /
+tmpfs           718M     0  718M   0% /dev/shm
+tmpfs           5.0M     0  5.0M   0% /run/lock
+vagrant         914G   86G  828G  10% /vagrant
+tmpfs           144M  4.0K  144M   1% /run/user/1000
+/dev/sdc        1.9G   24K  1.8G   1% /var/backup
+```
+6. Для аутентификации удаленных клиентов мы будем использовать SSH-ключи. Поэтому создадим нужную структуру папок и файлов:
+```
+root@backupServer:~# su - borg
+$ mkdir .ssh
+$ touch .ssh/authorized_keys
+$ chmod 700 .ssh
+$ chmod 600 .ssh/authorized_keys
+```
+7. Генерируем на клиенте пару ключей:
+```
+root@client:~# ssh-keygen
+root@client:~# cat .ssh/id_rsa.pub
+```
+Вернемся на сервер и добавим открытый ключ клиента в /var/backup/.ssh/authorized_keys.
+Проверяем что клиент может подключится к серверу по ssh:
+```
+root@client:~# ssh borg@192.168.56.160
+```
+8. Настраиваем бэкап (все дальнейшие действия буду проводится на клиенте)
+Инициализируем репозиторий borg на backup сервере с client сервера:
+```
+root@client:~# borg init --encryption=repokey borg@192.168.56.160:my_repo
+```
+Запускаем для проверки создания бэкапа:
+```
+root@client:~# borg create --stats --list borg@192.168.56.160:my_repo::"etc-{now:%Y-%m-%d_%H:%M:%S}" /etc
+```
+Посмотреть информацию по бэкапам:
+```
+root@client:~# borg list borg@192.168.56.160:my_repo
+Enter passphrase for key ssh://borg@192.168.56.160/./my_repo: 
+etc-2024-07-01_11:24:27              Mon, 2024-07-01 11:24:31 [b63f05ccfc1b8217bc18cc7287afa79b3a2bb155966c9c511fd45e1745a96efc]
+```
+Посмотреть список файлов в бэкапе:
+```
+root@client:~# borg list borg@192.168.56.160:my_repo::etc-2024-07-01_11:24:27
+```
+Восстановить из резевной копии:
+```
+root@client:~# borg extract borg@192.168.56.160:my_repo::etc-2024-07-01_11:24:27 etc/hostname
+```
