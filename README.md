@@ -96,3 +96,57 @@ root@client:~# borg list borg@192.168.56.160:my_repo::etc-2024-07-01_11:24:27
 ```
 root@client:~# borg extract borg@192.168.56.160:my_repo::etc-2024-07-01_11:24:27 etc/hostname
 ```
+9. Автоматизируем создание бэкапов с помощью systemd. Создаем сервис и таймер в каталоге /etc/systemd/system/
+```
+root@client:~# vim /etc/systemd/system/borg-backup.service
+
+[Unit]
+Description=Borg Backup
+
+[Service]
+Type=oneshot
+
+# Парольная фраза
+Environment="BORG_PASSPHRASE=1111"
+# Репозиторий
+Environment=REPO=borg@192.168.56.160:my_repo
+# Что бэкапим
+Environment=BACKUP_TARGET=/etc
+
+# Создание бэкапа
+ExecStart=/bin/borg create \
+    --stats                \
+    ${REPO}::etc-{now:%%Y-%%m-%%d_%%H:%%M:%%S} ${BACKUP_TARGET}
+
+# Проверка бэкапа
+ExecStart=/bin/borg check ${REPO}
+
+# Очистка старых бэкапов
+ExecStart=/bin/borg prune \
+    --keep-daily  90      \
+    --keep-monthly 12     \
+    --keep-yearly  1       \
+    ${REPO}
+```
+```
+root@client:~# vim /etc/systemd/system/borg-backup.timer
+
+[Unit]
+Description=Borg Backup
+
+[Timer]
+OnUnitActiveSec=5min
+
+[Install]
+WantedBy=timers.target
+```
+Включаем и запускаем службу таймера:
+```
+root@client:~# systemctl enable borg-backup.timer
+Created symlink /etc/systemd/system/timers.target.wants/borg-backup.timer → /etc/systemd/system/borg-backup.timer.
+root@client:~# systemctl start borg-backup.timer
+```
+Проверяем работу таймера:
+```
+root@client:~# systemctl list-timers --all
+```
