@@ -145,8 +145,12 @@ WantedBy=timers.target
 root@client:~# systemctl enable borg-backup.timer
 Created symlink /etc/systemd/system/timers.target.wants/borg-backup.timer → /etc/systemd/system/borg-backup.timer.
 root@client:~# systemctl start borg-backup.timer
+root@client:~# systemctl start borg-backup.service
 ```
 Проверяем работу таймера:
 ```
 root@client:~# systemctl list-timers --all
 ```
+Логи можно посмотреть в systemd journal или в /var/log/syslog:
+
+![image](https://github.com/bonyakevich-e/otus_lp_lesson_27_backup/assets/114911797/3186cbd3-087e-4aa5-8905-aeb1082f65ef)
