@@ -24,7 +24,7 @@ $ vagrant up
 ```
 root@backupServer:~# mkdir /var/backup
 root@backupServer:~# useradd -m -d /var/backup borg
-chown borg:borg /var/backup/
+root@backupServer:~# chown borg:borg /var/backup/
 ```
 4. Подготовим и примонтируем дополнительный диск для хранения бэкапов:
 ```
