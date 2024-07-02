@@ -12,16 +12,16 @@
 - настроено логирование процесса бекапа. Для упрощения можно весь вывод перенаправлять в logger с соответствующим тегом. Если настроите не в syslog, то обязательна ротация логов.
 #### Инструкция по выполнению домашнего задания:
 1. Поднимаем виртуальные машины "backupServer" и "client":
-```
+```console
 $ vagrant up
 ```
 2. Устанавливаем Borg Backup на сервер и клиент:
-```
+```console
 # apt update
 # apt install borgbackup
 ```
 3. Подготовим и примонтируем дополнительный диск для хранения бэкапов:
-```
+```console
 root@backupServer:~# lsblk
 NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
 loop0    7:0    0   87M  1 loop /snap/lxd/28373
@@ -33,12 +33,12 @@ sdb      8:16   0   10M  0 disk
 sdc      8:32   0    2G  0 disk 
 
 ```
-```
+```console
 root@backupServer:~# mkfs.ext4 /dev/sdc
 root@backupServer:~# echo "`blkid | grep sdc | awk '{print $2}'` /var/backup ext4 defaults 0 0" >> /etc/fstab
 root@backupServer:~# mount -a
 ```
-```
+```console
 root@backupServer:~# df -h
 Filesystem      Size  Used Avail Use% Mounted on
 tmpfs           144M  988K  143M   1% /run
@@ -50,13 +50,13 @@ tmpfs           144M  4.0K  144M   1% /run/user/1000
 /dev/sdc        1.9G   24K  1.8G   1% /var/backup
 ```
 4. На сервере backup создаем пользователя и каталог /var/backup. Особенностью Borg Backup является то, что он создает репозитории для хранения резервных копий в собственной домашней директории.
-```
+```console
 root@backupServer:~# mkdir /var/backup
 root@backupServer:~# useradd -m -d /var/backup borg
 root@backupServer:~# chown borg:borg /var/backup/
 ```
 5. Для аутентификации удаленных клиентов мы будем использовать SSH-ключи. Поэтому создадим нужную структуру папок и файлов:
-```
+```console
 root@backupServer:~# su - borg
 $ mkdir .ssh
 $ touch .ssh/authorized_keys
@@ -64,40 +64,40 @@ $ chmod 700 .ssh
 $ chmod 600 .ssh/authorized_keys
 ```
 6. Генерируем на клиенте пару ключей:
-```
+```console
 root@client:~# ssh-keygen
 root@client:~# cat .ssh/id_rsa.pub
 ```
 Вернемся на сервер и добавим открытый ключ клиента в /var/backup/.ssh/authorized_keys.
 Проверяем что клиент может подключится к серверу по ssh:
-```
+```console
 root@client:~# ssh borg@192.168.56.160
 ```
 7. Настраиваем бэкап (все дальнейшие действия буду проводится на клиенте)
 Инициализируем репозиторий borg на backup сервере с client сервера:
-```
+```console
 root@client:~# borg init --encryption=repokey borg@192.168.56.160:my_repo
 ```
 Запускаем для проверки создания бэкапа:
-```
+```console
 root@client:~# borg create --stats --list borg@192.168.56.160:my_repo::"etc-{now:%Y-%m-%d_%H:%M:%S}" /etc
 ```
 Посмотреть информацию по бэкапам:
-```
+```console
 root@client:~# borg list borg@192.168.56.160:my_repo
 Enter passphrase for key ssh://borg@192.168.56.160/./my_repo: 
 etc-2024-07-01_11:24:27              Mon, 2024-07-01 11:24:31 [b63f05ccfc1b8217bc18cc7287afa79b3a2bb155966c9c511fd45e1745a96efc]
 ```
 Посмотреть список файлов в бэкапе:
-```
+```console
 root@client:~# borg list borg@192.168.56.160:my_repo::etc-2024-07-01_11:24:27
 ```
 Восстановить из резевной копии:
-```
+```console
 root@client:~# borg extract borg@192.168.56.160:my_repo::etc-2024-07-01_11:24:27 etc/hostname
 ```
 8. Автоматизируем создание бэкапов с помощью systemd. Создаем сервис и таймер в каталоге /etc/systemd/system/
-```
+```console
 root@client:~# vim /etc/systemd/system/borg-backup.service
 
 [Unit]
@@ -128,7 +128,7 @@ ExecStart=/bin/borg prune \
     --keep-yearly  1       \
     ${REPO}
 ```
-```
+```console
 root@client:~# vim /etc/systemd/system/borg-backup.timer
 
 [Unit]
@@ -141,14 +141,14 @@ OnUnitActiveSec=5min
 WantedBy=timers.target
 ```
 Включаем и запускаем службу таймера:
-```
+```console
 root@client:~# systemctl enable borg-backup.timer
 Created symlink /etc/systemd/system/timers.target.wants/borg-backup.timer → /etc/systemd/system/borg-backup.timer.
 root@client:~# systemctl start borg-backup.timer
 root@client:~# systemctl start borg-backup.service
 ```
 Проверяем работу таймера:
-```
+```console
 root@client:~# systemctl list-timers --all
 ```
 Логи можно посмотреть в systemd journal или в /var/log/syslog:
