@@ -20,13 +20,7 @@ $ vagrant up
 # apt update
 # apt install borgbackup
 ```
-3. На сервере backup создаем пользователя и каталог /var/backup. Особенностью Borg Backup является то, что он создает репозитории для хранения резервных копий в собственной домашней директории.
-```
-root@backupServer:~# mkdir /var/backup
-root@backupServer:~# useradd -m -d /var/backup borg
-root@backupServer:~# chown borg:borg /var/backup/
-```
-4. Подготовим и примонтируем дополнительный диск для хранения бэкапов:
+3. Подготовим и примонтируем дополнительный диск для хранения бэкапов:
 ```
 root@backupServer:~# lsblk
 NAME   MAJ:MIN RM  SIZE RO TYPE MOUNTPOINTS
@@ -55,7 +49,13 @@ vagrant         914G   86G  828G  10% /vagrant
 tmpfs           144M  4.0K  144M   1% /run/user/1000
 /dev/sdc        1.9G   24K  1.8G   1% /var/backup
 ```
-6. Для аутентификации удаленных клиентов мы будем использовать SSH-ключи. Поэтому создадим нужную структуру папок и файлов:
+4. На сервере backup создаем пользователя и каталог /var/backup. Особенностью Borg Backup является то, что он создает репозитории для хранения резервных копий в собственной домашней директории.
+```
+root@backupServer:~# mkdir /var/backup
+root@backupServer:~# useradd -m -d /var/backup borg
+root@backupServer:~# chown borg:borg /var/backup/
+```
+5. Для аутентификации удаленных клиентов мы будем использовать SSH-ключи. Поэтому создадим нужную структуру папок и файлов:
 ```
 root@backupServer:~# su - borg
 $ mkdir .ssh
@@ -63,7 +63,7 @@ $ touch .ssh/authorized_keys
 $ chmod 700 .ssh
 $ chmod 600 .ssh/authorized_keys
 ```
-7. Генерируем на клиенте пару ключей:
+6. Генерируем на клиенте пару ключей:
 ```
 root@client:~# ssh-keygen
 root@client:~# cat .ssh/id_rsa.pub
@@ -73,7 +73,7 @@ root@client:~# cat .ssh/id_rsa.pub
 ```
 root@client:~# ssh borg@192.168.56.160
 ```
-8. Настраиваем бэкап (все дальнейшие действия буду проводится на клиенте)
+7. Настраиваем бэкап (все дальнейшие действия буду проводится на клиенте)
 Инициализируем репозиторий borg на backup сервере с client сервера:
 ```
 root@client:~# borg init --encryption=repokey borg@192.168.56.160:my_repo
@@ -96,7 +96,7 @@ root@client:~# borg list borg@192.168.56.160:my_repo::etc-2024-07-01_11:24:27
 ```
 root@client:~# borg extract borg@192.168.56.160:my_repo::etc-2024-07-01_11:24:27 etc/hostname
 ```
-9. Автоматизируем создание бэкапов с помощью systemd. Создаем сервис и таймер в каталоге /etc/systemd/system/
+8. Автоматизируем создание бэкапов с помощью systemd. Создаем сервис и таймер в каталоге /etc/systemd/system/
 ```
 root@client:~# vim /etc/systemd/system/borg-backup.service
 
